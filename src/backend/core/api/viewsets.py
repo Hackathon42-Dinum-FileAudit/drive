@@ -311,6 +311,26 @@ class UserViewSet(
 
         return drf.response.Response(self.get_serializer(contacts, many=True).data)
 
+    @drf.decorators.action(
+        detail=True,
+        methods=["get"],
+        url_path="handover/audit",
+        permission_classes=[permissions.IsManagerOf],
+    )
+    def handover_audit(self, request, pk=None):
+        # 1. self.get_object() fetches the User with pk=pk
+        #    and triggers `has_object_permission`!
+        departing_user = self.get_object()
+
+        # 2. Return dummy data for now so you can test immediately with Yaak:
+        return drf.response.Response(
+            {
+                "status": "ready",
+                "manager": request.user.email,
+                "departing_user": departing_user.email,
+            }
+        )
+
 
 class ItemMetadata(drf.metadata.SimpleMetadata):
     """Custom metadata class to add information"""

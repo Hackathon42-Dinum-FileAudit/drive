@@ -149,3 +149,78 @@ class ItemPermission(permissions.BasePermission):
             raise Http404
 
         return has_permission
+
+
+class IsManagerOf(IsAuthenticated):
+    """
+    Permission class ensuring that the requesting user has managerial
+    authority over the targeted user for handover and offboarding operations.
+    """
+
+    def has_permission(self, request, view):
+        """
+        Initial gate check before fetching the object.
+        """
+        # Base check: user must be authenticated
+        if not super().has_permission(request, view):
+            return False
+
+        # -------------------------------------------------------------
+        # [SECURITY TODO - STEP-UP AUTHENTICATION]
+        # In production, check recent MFA / WebAuthn authentication:
+        # auth_time = request.auth.get("auth_time") if request.auth else None
+        # if not auth_time or (timezone.now().timestamp() - auth_time) > 900:
+        #     raise exceptions.AuthenticationFailed("MFA re-authentication required.")
+        # -------------------------------------------------------------
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Object-level check where `obj` is the departing User instance.
+        """
+        manager = request.user
+        subordinate = obj
+
+        # Rule 1: Anti-Self Handover
+        # A user cannot perform a manager handover audit on themselves.
+        if manager.id == subordinate.id:
+            return False
+
+        # Rule 2: Staff / Superuser bypass for development and administrative ease
+        if manager.is_staff or manager.is_superuser:
+            return True
+
+        # -------------------------------------------------------------
+        # [SECURITY TODO - MULTI-TENANT SIRET ISOLATION]
+        # Ensure the manager and subordinate belong to the exact same organization:
+        # manager_siret = manager.claims.get("siret")
+        # subordinae_siret = subordinate.claims.get("siret")
+        # if not manager_siret or manager_siret != subordinate_siret:
+        #     return False
+        # -------------------------------------------------------------
+
+        # Rule 3: Manager relationship verification (Mocked for now)
+        return self._check_is_manager_of(manager, subordinate)
+
+    def _check_is_manager_of(self, manager, subordinate):
+        """
+        Verify that `manager` has authority over `subordinate`.
+        Mocked for local development without external 'People' dependencies.
+        """
+        # -------------------------------------------------------------
+        # [INTEGRATION TODO - PEOPLE / LA RÉGIE API / ACCOUNTS ]
+        # In production:
+        # 1. Obtain an inter-service JWT token.
+        # 2. Call People/ACCOUNTS API: GET /api/v1.0/teams/?manager={manager.id}&member={subordinate.id}
+        # 3. Cache the relationship in Redis (e.g. 5 min TTL).
+        # -------------------------------------------------------------
+
+        # MOCK IMPLEMENTATION FOR DEVELOPMENT:
+        # Option A: Simple allow-all for authenticated users in dev:
+        # return True
+
+        # Option B: Mock via team match or simple email convention:
+        # e.g., allow if manager shares any team with subordinate:
+        # return bool(set(manager.teams) & set(subordinate.teams))
+
+        return True
