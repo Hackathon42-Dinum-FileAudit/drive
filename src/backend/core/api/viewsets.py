@@ -47,6 +47,7 @@ from rest_framework_api_key.permissions import HasAPIKey
 
 from core import enums, models
 from core.entitlements import get_entitlements_backend
+from core.services import handover
 from core.services.accesses import (
     batch_share_process_rows,
     synchronize_descendants_accesses,
@@ -318,18 +319,18 @@ class UserViewSet(
         permission_classes=[permissions.IsManagerOf],
     )
     def handover_audit(self, request, pk=None):
-        # 1. self.get_object() fetches the User with pk=pk
+        # self.get_object() fetches the User with pk=pk
         #    and triggers `has_object_permission`!
         departing_user = self.get_object()
 
-        # 2. Return dummy data for now so you can test immediately with Yaak:
-        return drf.response.Response(
-            {
-                "status": "ready",
-                "manager": request.user.email,
-                "departing_user": departing_user.email,
-            }
-        )
+        audit_data = handover.build_user_handover_audit(departing_user)
+        audit_data["departing_user"] = {
+            "id": str(departing_user.id),
+            "email": departing_user.email,
+            "full_name": departing_user.full_name,
+        }
+
+        return drf.response.Response(audit_data)
 
 
 class ItemMetadata(drf.metadata.SimpleMetadata):
