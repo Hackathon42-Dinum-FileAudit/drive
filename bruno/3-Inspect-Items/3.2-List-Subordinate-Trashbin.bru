@@ -1,0 +1,16 @@
+meta {
+  name: 3.2 List Subordinate Trashbin
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1.0/items/trashbin/
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: {{session_cookie}}
+}

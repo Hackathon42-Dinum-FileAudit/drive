@@ -73,3 +73,29 @@ def test_commands_create_demo_can_be_run_twice_without_resetting_database():
     call_command("create_demo", "--file_types")
 
     assert models.User.objects.filter(email="drive@drive.world").count() == 1
+
+
+@override_settings(DEBUG=True)
+def test_commands_create_handover_demo():
+    """The create_handover_demo command should provision handover scenario objects."""
+    call_command("create_handover_demo")
+
+    assert models.User.objects.filter(email="manager@example.com", is_staff=True).exists()
+    assert models.User.objects.filter(email="subordinate@example.com").exists()
+    assert models.User.objects.filter(email="drive@drive.world").exists()
+
+    # Check key handover items
+    assert models.Item.objects.filter(id="11111111-1111-1111-1111-111111111111").exists()
+    assert models.Item.objects.filter(id="22222222-2222-2222-2222-111111111111").exists()
+    assert models.Item.objects.filter(id="55555555-5555-5555-5555-111111111111").exists()
+    assert models.Item.objects.filter(id="66666666-6666-6666-6666-111111111111", deleted_at__isnull=False).exists()
+
+
+@override_settings(DEBUG=True)
+def test_commands_create_demo_with_handover():
+    """The create_demo command should support --handover option."""
+    call_command("create_demo", "--handover")
+
+    assert models.User.objects.filter(email="manager@example.com").exists()
+    assert models.Item.objects.filter(id="11111111-1111-1111-1111-111111111111").exists()
+

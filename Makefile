@@ -227,6 +227,11 @@ reconciliation-demo: resetdb
 	@$(MANAGE) create_reconciliation_demo
 .PHONY: reconciliation-demo
 
+handover-demo: ## create demo data for handover and offboarding audits
+handover-demo:
+	@$(MANAGE) create_handover_demo
+.PHONY: handover-demo
+
 index: ## index all files to remote search
 	@$(MANAGE) index
 .PHONY: index

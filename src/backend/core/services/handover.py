@@ -11,12 +11,13 @@ from core import models
 
 # TODO: DRF and Throttling
 """
-## DRF Serializers (core/api/serializers.py) - for swagger / frontend types genration
+## DRF Serializers (core/api/serializers.py) - for swagger / frontend types generation
 
 Define standard DRF serializers for request documentation and response formatting:
 
 1. HandoverAuditItemSerializer:
-    • Fields: id, title, type (file or folder), size, is_sole_owner, is_flagged_personal, updated_at.
+    • Fields: id, title, type, size, depth, parent_id, parent_title, breadcrumbs,
+      is_sole_owner, is_shared, other_members_count, is_flagged_personal, updated_at.
 2. HandoverAuditSummarySerializer:
     • Fields: total_items, total_bytes, sole_owner_count, shared_count, personal_flagged_count.
 3. HandoverAuditResponseSerializer:
@@ -24,7 +25,7 @@ Define standard DRF serializers for request documentation and response formattin
         • departing_user: nested light user representation (UserLightSerializer).
         • summary: nested HandoverAuditSummarySerializer.
         • items: list of HandoverAuditItemSerializer.
-        • handover_token: string (the signed challenge token required for the transfer endpoint).
+        • handover_token: string (the signed challenge token required for transfer).
 
 
 ## Throttling (core/api/throttling.py) - minimal security
@@ -32,7 +33,8 @@ Define standard DRF serializers for request documentation and response formattin
 Handover audits are rare administrative events. Protect against brute-force enumeration:
 
 Create a throttle class inheriting from rest_framework.throttling.UserRateThrottle:
-    • Set scope = "handover_audit" (configured in settings.py e.g., "10/hour"), or set a default rate = "10/hour".
+    • Set scope = "handover_audit" (configured in settings.py e.g., "10/hour"),
+      or set a default rate = "10/hour".
 """
 
 
@@ -78,11 +80,28 @@ def get_departing_user_administered_items(departing_user):
 
 def build_user_handover_audit(departing_user):
     """
-    Compile the audit data and summary metrics for the line manager.
+    Compile the audit data, hierarchy relations, and summary metrics for the line manager.
     """
     items_qs = get_departing_user_administered_items(departing_user)
+    items = list(items_qs)
 
-    # Storage quota in Drive is charged to creator
+    # 1. Collect all unique ancestor IDs from item paths
+    ancestor_ids = set()
+    for item in items:
+        if len(item.path) > 1:
+            ancestor_ids.update(str(p_id) for p_id in item.path[:-1])
+
+    # 2. Batch fetch folder titles in ONE query (avoids 100+ SQL queries)
+    folder_map = {}
+    if ancestor_ids:
+        for folder in (
+            models.Item.objects.filter(id__in=ancestor_ids)
+            .only("id", "title")
+            .iterator()
+        ):
+            folder_map[str(folder.id)] = folder.title
+
+    # 3. Storage quota in Drive is charged to creator
     total_bytes = (
         models.Item.objects.filter(
             creator=departing_user,
@@ -94,8 +113,10 @@ def build_user_handover_audit(departing_user):
     items_list = []
     sole_owner_count = 0
     shared_count = 0
+    # TODO: Implement personal file/folder detection later
+    personal_flagged_count = 0
 
-    for item in items_qs:
+    for item in items:
         # Sole owner: departing agent is an owner and total owner count is <= 1
         is_sole_owner = item.total_owners_count <= 1
         if is_sole_owner:
@@ -105,15 +126,33 @@ def build_user_handover_audit(departing_user):
         if is_shared:
             shared_count += 1
 
+        # Ancestor folder IDs from root down to direct parent
+        ancestor_path_ids = [str(p_id) for p_id in item.path[:-1]]
+
+        # Direct parent: last element in ancestor path (or None if item is at root)
+        parent_id = ancestor_path_ids[-1] if ancestor_path_ids else None
+        parent_title = folder_map.get(parent_id) if parent_id else None
+
+        # Breadcrumbs list: [{ id, title }, ...]
+        breadcrumbs = [
+            {"id": p_id, "title": folder_map.get(p_id, "")}
+            for p_id in ancestor_path_ids
+        ]
+
         items_list.append(
             {
                 "id": str(item.id),
                 "title": item.title,
                 "type": item.type,
                 "size": item.size,
+                "depth": len(item.path),
+                "parent_id": parent_id,
+                "parent_title": parent_title,
+                "breadcrumbs": breadcrumbs,
                 "is_sole_owner": is_sole_owner,
                 "is_shared": is_shared,
                 "other_members_count": item.other_accesses_count,
+                "is_flagged_personal": False,  # TODO: personal files detection
                 "created_at": item.created_at,
                 "updated_at": item.updated_at,
             }
@@ -125,6 +164,7 @@ def build_user_handover_audit(departing_user):
             "total_bytes": total_bytes,
             "sole_owner_count": sole_owner_count,
             "shared_count": shared_count,
+            "personal_flagged_count": personal_flagged_count,
         },
         "items": items_list,
     }

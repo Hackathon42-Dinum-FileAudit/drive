@@ -1,0 +1,25 @@
+meta {
+  name: 4.9 [Case 5] Create Personal Folder (Arrêt Nikon)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/items/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: {{session_cookie}}
+  X-CSRFToken: {{csrf_token}}
+}
+
+body:json {
+  {
+    "id": "55555555-5555-5555-5555-111111111111",
+    "type": "folder",
+    "title": "PERSO - Bulletins de salaire et congés"
+  }
+}

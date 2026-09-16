@@ -1,0 +1,24 @@
+meta {
+  name: 4.4 [Case 2] Grant Co-Owner Access to Colleague
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/items/22222222-2222-2222-2222-111111111111/accesses/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: {{session_cookie}}
+  X-CSRFToken: {{csrf_token}}
+}
+
+body:json {
+  {
+    "user_id": "{{colleague_id}}",
+    "role": "owner"
+  }
+}

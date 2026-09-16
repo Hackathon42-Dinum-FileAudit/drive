@@ -1,0 +1,25 @@
+meta {
+  name: 4.10 [Case 6] Create Folder for Trashbin
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/items/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: {{session_cookie}}
+  X-CSRFToken: {{csrf_token}}
+}
+
+body:json {
+  {
+    "id": "66666666-6666-6666-6666-111111111111",
+    "type": "folder",
+    "title": "Ancien Projet Abandonné (Corbeille)"
+  }
+}

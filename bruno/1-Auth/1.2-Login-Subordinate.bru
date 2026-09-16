@@ -1,0 +1,40 @@
+meta {
+  name: 1.2 Login as Subordinate
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/e2e/user-auth/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "subordinate@example.com"
+  }
+}
+
+script:post-response {
+  const setCookies = res.getHeader('set-cookie');
+  if (setCookies) {
+    const list = Array.isArray(setCookies) ? setCookies : [setCookies];
+    for (let c of list) {
+      if (c.includes('drive_sessionid=')) {
+        const sid = c.split(';')[0];
+        bru.setVar('session_cookie', sid);
+        try { bru.setEnvVar('session_cookie', sid); } catch (e) {}
+      }
+      if (c.includes('csrftoken=')) {
+        const csrf = c.split(';')[0].split('=')[1];
+        bru.setVar('csrf_token', csrf);
+        try { bru.setEnvVar('csrf_token', csrf); } catch (e) {}
+      }
+    }
+  }
+}

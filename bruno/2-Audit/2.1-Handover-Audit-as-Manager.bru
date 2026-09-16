@@ -1,0 +1,16 @@
+meta {
+  name: 2.1 Handover Audit (as Manager) [200 OK]
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/audit/
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: {{session_cookie}}
+}

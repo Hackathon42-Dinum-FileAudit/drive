@@ -1,0 +1,25 @@
+meta {
+  name: 4.1 [Case 1] Create Solo Folder
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/items/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: {{session_cookie}}
+  X-CSRFToken: {{csrf_token}}
+}
+
+body:json {
+  {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "type": "folder",
+    "title": "Projet Alpha (Solo Owner)"
+  }
+}
