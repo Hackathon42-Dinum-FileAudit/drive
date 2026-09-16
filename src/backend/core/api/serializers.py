@@ -67,6 +67,13 @@ class UserLightSerializer(UserSerializer):
         read_only_fields = ["id", "full_name", "short_name"]
 
 
+class HandoverDeleteSerializer(serializers.Serializer):
+    """Validate the item selected for deletion during a user's handover."""
+
+    item_id = serializers.UUIDField()
+    title = serializers.CharField()
+
+
 # pylint: disable=abstract-method
 class UserUsageMetricSerializer(serializers.BaseSerializer):
     """Serialize usage metrics for a single user."""

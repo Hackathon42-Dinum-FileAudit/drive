@@ -332,6 +332,51 @@ class UserViewSet(
 
         return drf.response.Response(audit_data)
 
+    @extend_schema(request=serializers.HandoverDeleteSerializer)
+    @drf.decorators.action(
+        detail=True,
+        methods=["delete"],
+        url_path="handover/delete",
+        permission_classes=[permissions.IsManagerOf],
+    )
+    def handover_delete(self, request, pk=None):
+        """Permanently delete a file selected during a user's handover."""
+        departing_user = self.get_object()
+        serializer = serializers.HandoverDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        item = (
+            handover.get_departing_user_administered_items(departing_user)
+            .filter(
+                pk=serializer.validated_data["item_id"],
+                type=models.ItemTypeChoices.FILE,
+            )
+            .first()
+        )
+        if item is None:
+            return drf.response.Response(
+                {
+                    "detail": "The selected file is not eligible for handover deletion.",
+                    "item_id": str(serializer.validated_data["item_id"]),
+                    "title": serializer.validated_data["title"],
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        with transaction.atomic():
+            item.soft_delete()
+            item.hard_delete()
+            transaction.on_commit(lambda: process_item_purge.delay(item.id))
+
+        return drf.response.Response(
+            {
+                "detail": "The file was successfully deleted.",
+                "item_id": str(item.id),
+                "title": serializer.validated_data["title"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class ItemMetadata(drf.metadata.SimpleMetadata):
     """Custom metadata class to add information"""
