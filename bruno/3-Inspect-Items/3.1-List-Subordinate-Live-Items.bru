@@ -12,5 +12,9 @@ get {
 
 headers {
   Accept: application/json
-  Cookie: {{session_cookie}}
+  Cookie: {{cookie_header}}
+}
+
+assert {
+  res.status: eq 200
 }

@@ -1,0 +1,35 @@
+meta {
+  name: 5.2 Anti-Self Transfer Dry-Run [200 OK - Blocked]
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/transfer/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "recipient_id": "{{subordinate_id}}",
+    "item_ids": [
+      "a0000000-0000-0000-0000-000000000001"
+    ],
+    "dry_run": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.dry_run: eq true
+  res.body.can_execute: eq false
+  res.body.errors[0].code: eq invalid_recipient
+}

@@ -1,0 +1,34 @@
+meta {
+  name: 5.3 Anti-Self Transfer Execution [400 Bad Request]
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/transfer/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "recipient_id": "{{subordinate_id}}",
+    "item_ids": [
+      "a0000000-0000-0000-0000-000000000001"
+    ],
+    "dry_run": false
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.type: eq validation_error
+  res.body.errors[0].attr: eq detail
+}

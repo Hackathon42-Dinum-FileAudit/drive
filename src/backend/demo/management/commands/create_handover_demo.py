@@ -30,6 +30,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from core import factories, models
 
@@ -102,6 +103,7 @@ def _make_file(
     creator=None,
     users=None,
     item_id=None,
+    deleted_at=None,
 ):
     """Helper to create a ready file with storage entry."""
     file_item = factories.ItemFactory(
@@ -115,6 +117,7 @@ def _make_file(
         update_upload_state=models.ItemUploadStateChoices.READY,
         size=size,
         users=users or [],
+        deleted_at=deleted_at,
     )
     content = f"Dummy content for {filename}".encode("utf-8")
     default_storage.save(file_item.file_key, BytesIO(content))
@@ -134,17 +137,6 @@ def create_handover_demo(stdout=None):
     log(f"  [✓] Colleague:   {colleague.email} (ID: {colleague.id})")
 
     log(" [2/3] Resetting previous test items for idempotency...")
-    # Delete previous test items matching the demo prefix as well as legacy IDs
-    legacy_ids = [
-        "11111111-1111-1111-1111-111111111111",
-        "11111111-1111-1111-1111-222222222222",
-        "22222222-2222-2222-2222-111111111111",
-        "33333333-3333-3333-3333-111111111111",
-        "44444444-4444-4444-4444-111111111111",
-        "55555555-5555-5555-5555-111111111111",
-        "66666666-6666-6666-6666-111111111111",
-    ]
-    models.Item.objects.filter(id__in=legacy_ids).delete()
     models.Item.objects.filter(id__startswith=DEMO_ITEM_PREFIX).delete()
 
     log(" [3/3] Creating rich folder & file hierarchy (in English)...")
@@ -340,32 +332,44 @@ def create_handover_demo(stdout=None):
         users=sub_admin,
     )
 
-    # --- CASE 6: Empty Archive Folder ---
-    factories.ItemFactory(
+    # --- CASE 6: Unshared Personal Folder (Subordinate sole owner, zero collaborators) ---
+    folder_6 = factories.ItemFactory(
         id=f"{DEMO_ITEM_PREFIX}000000000060",
-        title="6_Empty_Archive_Folder",
+        title="6_Unshared_Personal_Folder",
         type=models.ItemTypeChoices.FOLDER,
         creator=subordinate,
-        users=shared_reader,
+        users=[(subordinate, models.RoleChoices.OWNER)],
+    )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000061",
+        title="personal_expenses_receipts.pdf",
+        filename="personal_expenses_receipts.pdf",
+        mimetype="application/pdf",
+        size=180000,
+        parent=folder_6,
+        creator=subordinate,
+        users=[(subordinate, models.RoleChoices.OWNER)],
     )
 
-    # --- CASE 7: Personal Records (Privacy test scenario) ---
+    # --- CASE 7: Soft-Deleted Folder in Trashbin (Archival retention scenario) ---
     folder_7 = factories.ItemFactory(
         id=f"{DEMO_ITEM_PREFIX}000000000070",
-        title="7_PERSONAL_Pay_Slips_And_Private_Records",
+        title="7_Old_Drafts_In_Trashbin",
         type=models.ItemTypeChoices.FOLDER,
         creator=subordinate,
+        deleted_at=timezone.now(),
         users=shared_reader,
     )
     _make_file(
         item_id=f"{DEMO_ITEM_PREFIX}000000000071",
-        title="january_2026_salary_statement.pdf",
-        filename="january_2026_salary_statement.pdf",
-        mimetype="application/pdf",
-        size=120000,
+        title="discarded_meeting_notes_2025.odt",
+        filename="discarded_meeting_notes_2025.odt",
+        mimetype="application/vnd.oasis.opendocument.text",
+        size=320000,
         parent=folder_7,
         creator=subordinate,
         users=shared_reader,
+        deleted_at=timezone.now(),
     )
 
     log("  [✓] All folder structures and files generated successfully in English.")

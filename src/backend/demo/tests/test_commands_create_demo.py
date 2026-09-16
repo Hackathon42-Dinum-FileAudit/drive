@@ -84,11 +84,15 @@ def test_commands_create_handover_demo():
     assert models.User.objects.filter(email="subordinate@example.com").exists()
     assert models.User.objects.filter(email="drive@drive.world").exists()
 
-    # Check key handover items
-    assert models.Item.objects.filter(id="11111111-1111-1111-1111-111111111111").exists()
-    assert models.Item.objects.filter(id="22222222-2222-2222-2222-111111111111").exists()
-    assert models.Item.objects.filter(id="55555555-5555-5555-5555-111111111111").exists()
-    assert models.Item.objects.filter(id="66666666-6666-6666-6666-111111111111", deleted_at__isnull=False).exists()
+    # Check key handover items matching DEMO_ITEM_PREFIX
+    prefix = "a0000000-0000-0000-0000-"
+    assert models.Item.objects.filter(id=f"{prefix}000000000001").exists()
+    assert models.Item.objects.filter(id=f"{prefix}000000000010").exists()
+    assert models.Item.objects.filter(id=f"{prefix}000000000050").exists()
+    assert models.Item.objects.filter(id=f"{prefix}000000000060").exists()
+    assert models.Item.objects.filter(
+        id=f"{prefix}000000000070", deleted_at__isnull=False
+    ).exists()
 
 
 @override_settings(DEBUG=True)
@@ -97,5 +101,6 @@ def test_commands_create_demo_with_handover():
     call_command("create_demo", "--handover")
 
     assert models.User.objects.filter(email="manager@example.com").exists()
-    assert models.Item.objects.filter(id="11111111-1111-1111-1111-111111111111").exists()
+    assert models.Item.objects.filter(id="a0000000-0000-0000-0000-000000000001").exists()
+
 
