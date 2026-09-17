@@ -1,0 +1,30 @@
+meta {
+  name: 6.4 Delete Missing Item ID Attempt [400 Bad Request]
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/delete/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "title": "missing_id.txt"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.type: eq validation_error
+  res.body.errors[0].attr: eq item_id
+}

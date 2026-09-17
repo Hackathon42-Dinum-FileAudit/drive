@@ -349,6 +349,31 @@ The audit endpoint returns high-level metrics accompanied by an explicit breakdo
 
 ---
 
+### 6.3. Endpoint 3: Handover File Deletion (Current Status & Planned TODO Refactor)
+
+- **HTTP Route**: `DELETE /api/v1.0/users/{user_id}/handover/delete/`
+- **Permission**: `IsAuthenticated, IsManagerOf`
+- **Current Payload**: `{"item_id": "<UUID>", "title": "<string>"}`
+- **Current Behavior**: Soft-deletes and immediately hard-deletes the file, dispatching Celery `process_item_purge` to permanently purge the S3 binary.
+
+#### Planned Refactoring Scope (TODO for Future Iteration)
+
+1. **Query Perimeter Correction**:
+   - Currently, the query resolves files through `get_departing_user_administered_items(departing_user)` which restricts to shared items (`other_accesses_count > 0`). As a result, unshared/personal files (`skipped_unshared_*`) return `404 Not Found`, while shared collaborative team files are permitted to be deleted.
+   - *Future change*: Refactor query to allow selecting unshared or user-created files, while protecting shared collaborative assets from unilateral deletion without co-owner consent.
+2. **Lifecycle & Data Retention (*Code du patrimoine* L. 211-1)**:
+   - Immediate hard-delete and S3 object purge leaves zero recovery window.
+   - *Future change*: Replace hard-deletion with standard soft-deletion (`item.soft_delete()`), moving discarded files to the trashbin to adhere to public archival retention schedules.
+3. **HTTP Protocol & REST Semantics**:
+   - Sending a JSON payload within a `DELETE` request violates common HTTP proxy and API gateway conventions (bodies are frequently stripped).
+   - *Future change*: Adopt either RESTful URL parameters (`DELETE /api/v1.0/users/{user_id}/handover/items/{item_id}/`) or a batch POST endpoint (`POST /api/v1.0/users/{user_id}/handover/delete/` with `item_ids: [...]`).
+4. **Batch & Folder Support**:
+   - Extend beyond single-file deletion to accept a list of `item_ids` and support empty folders or cascading folder deletion.
+5. **Title Parameter Redundancy**:
+   - Validate `item.title == serializer.validated_data["title"]` as a confirmation guardrail, or remove the unverified parameter.
+
+---
+
 ## 7. External Handover Client Integration Guide
 
 The handover user experience is hosted inside the standalone **Handover Application** ([`suitenumerique/handover`](https://github.com/suitenumerique/handover)). This section serves as the integration guide for frontend developers building or consuming offboarding workflows.

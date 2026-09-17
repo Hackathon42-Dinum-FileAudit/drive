@@ -98,6 +98,18 @@ Covers the transfer and dry-run workflow:
 - **`5.5 Login as Recipient 2 (Bob)`**: Authenticates as `bob.colleague@example.com`.
 - **`5.6 Login as Recipient 3 (Charlie)`**: Authenticates as `charlie.colleague@example.com`.
 
+### Folder `6-Delete/`
+Covers the file deletion endpoint:
+- **`6.1 Delete Eligible File [200 OK]`**:
+  - `DELETE /api/v1.0/users/{{subordinate_id}}/handover/delete/`
+  - Deletes a shared administered file (`organization_brand_logo.png`).
+- **`6.2 Delete Unshared File Attempt [404 Not Found]`**:
+  - Demonstrates current query perimeter limitation: unshared files (`skipped_unshared_*`) return `404 Not Found` because `get_departing_user_administered_items` filters for shared items only.
+- **`6.3 Delete Anti-Self Attempt [403 Forbidden]`**:
+  - Verifies that managers cannot delete their own files via handover.
+- **`6.4 Delete Missing Item ID Attempt [400 Bad Request]`**:
+  - Verifies validation error when `item_id` is omitted.
+
 ---
 
 ## 4. Key Notes & Conventions

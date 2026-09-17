@@ -1,0 +1,29 @@
+meta {
+  name: 6.3 Delete Anti-Self Attempt [403 Forbidden]
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/v1.0/users/{{manager_id}}/handover/delete/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "item_id": "a0000000-0000-0000-0000-000000000001",
+    "title": "root_notes.txt"
+  }
+}
+
+assert {
+  res.status: eq 403
+}

@@ -340,7 +340,26 @@ class UserViewSet(
         permission_classes=[permissions.IsManagerOf],
     )
     def handover_delete(self, request, pk=None):
-        """Permanently delete a file selected during a user's handover."""
+        """
+        Permanently delete a file selected during a user's handover.
+
+        TODO (Handover Delete Refactor - Future Iteration):
+        1. Query Perimeter: Currently queries `get_departing_user_administered_items`
+           which restricts to shared items (`other_accesses_count > 0`), causing unshared
+           files (e.g. personal drafts) to 404 while shared team files get deleted.
+           Refactor to allow selecting unshared/sole-owner files created by the user.
+        2. Lifecycle & Data Safety: Switch from immediate hard-delete (`item.hard_delete()`
+           + Celery S3 purge) to standard soft-delete (`item.soft_delete()`). Soft-deletion
+           places files in the trashbin to preserve public archival retention compliance
+           (Code du patrimoine L. 211-1) with a recoverable retention window.
+        3. HTTP Semantics: Move away from DELETE with a JSON request body (often stripped
+           by proxies/gateways). Prefer RESTful URL path `DELETE .../handover/items/{item_id}/`
+           or `POST .../handover/delete/` with batch `item_ids: [...]`.
+        4. Batch & Folder Support: Accept `item_ids: [...]` to delete multiple items
+           in a single request, and support deleting empty folders or folders recursively.
+        5. Title Validation: Currently `title` is required but not verified against `item.title`.
+           Either validate `item.title == title` as a safety guardrail or remove the field.
+        """
         departing_user = self.get_object()
         serializer = serializers.HandoverDeleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

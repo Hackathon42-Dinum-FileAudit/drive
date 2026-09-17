@@ -1,0 +1,32 @@
+meta {
+  name: 6.1 Delete Eligible File [200 OK]
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/delete/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "item_id": "a0000000-0000-0000-0000-000000000023",
+    "title": "organization_brand_logo.png"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.item_id: eq a0000000-0000-0000-0000-000000000023
+  res.body.title: eq organization_brand_logo.png
+  res.body.detail: isDefined
+}

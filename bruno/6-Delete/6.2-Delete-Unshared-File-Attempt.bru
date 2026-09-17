@@ -1,0 +1,30 @@
+meta {
+  name: 6.2 Delete Unshared File Attempt [404 Not Found]
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/delete/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "item_id": "a0000000-0000-0000-0000-000000000061",
+    "title": "personal_expenses_receipts.pdf"
+  }
+}
+
+assert {
+  res.status: eq 404
+  res.body.detail: isDefined
+}
