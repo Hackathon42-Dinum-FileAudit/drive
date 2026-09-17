@@ -60,6 +60,66 @@ def test_build_user_handover_audit_summary_metrics():
     assert audit["items"][0]["id"] == str(shared_item.id)
 
 
+def test_build_user_handover_audit_multiowner_and_sole_owner():
+    """Verify that multi-owner and admin-only items have is_sole_owner=False."""
+    departing_user = factories.UserFactory()
+    colleague = factories.UserFactory()
+    successor_2 = factories.UserFactory()
+
+    # 1. Sole owner: departing_user is OWNER, colleague is READER
+    sole_item = factories.ItemFactory(
+        creator=departing_user,
+        size=1000,
+        users=[
+            (departing_user, models.RoleChoices.OWNER),
+            (colleague, models.RoleChoices.READER),
+        ],
+    )
+
+    # 2. Multi-owner: departing_user is OWNER, colleague is also OWNER
+    co_owned_item = factories.ItemFactory(
+        creator=departing_user,
+        size=2000,
+        users=[
+            (departing_user, models.RoleChoices.OWNER),
+            (colleague, models.RoleChoices.OWNER),
+        ],
+    )
+
+    # 3. Multi-owner (trio): departing_user is OWNER, colleague and successor_2 are OWNERS
+    trio_owned_item = factories.ItemFactory(
+        creator=departing_user,
+        size=3000,
+        users=[
+            (departing_user, models.RoleChoices.OWNER),
+            (colleague, models.RoleChoices.OWNER),
+            (successor_2, models.RoleChoices.OWNER),
+        ],
+    )
+
+    # 4. Colleague is OWNER, departing_user is ADMINISTRATOR (not owner)
+    admin_item = factories.ItemFactory(
+        creator=colleague,
+        size=4000,
+        users=[
+            (colleague, models.RoleChoices.OWNER),
+            (departing_user, models.RoleChoices.ADMIN),
+        ],
+    )
+
+    audit = handover.build_user_handover_audit(departing_user)
+    items_by_id = {it["id"]: it for it in audit["items"]}
+
+    assert audit["summary"]["total_items"] == 4
+    assert audit["summary"]["sole_owner_count"] == 1
+    assert audit["summary"]["shared_count"] == 4
+
+    assert items_by_id[str(sole_item.id)]["is_sole_owner"] is True
+    assert items_by_id[str(co_owned_item.id)]["is_sole_owner"] is False
+    assert items_by_id[str(trio_owned_item.id)]["is_sole_owner"] is False
+    assert items_by_id[str(admin_item.id)]["is_sole_owner"] is False
+
+
 def test_api_users_handover_audit_as_staff_manager():
     """Staff manager should successfully query subordinate handover audit."""
     manager = factories.UserFactory(is_staff=True)
@@ -360,4 +420,74 @@ def test_api_users_handover_transfer_selective_execution():
     assert models.ItemAccess.objects.filter(
         item=item_to_leave, user=subordinate, role=models.RoleChoices.OWNER
     ).exists()
+
+
+def test_is_user_in_manager_team_service():
+    """Verify is_user_in_manager_team behavior across roles and environments."""
+    # 1. Staff and Superuser always allowed
+    staff_manager = factories.UserFactory(is_staff=True)
+    superuser_manager = factories.UserFactory(is_superuser=True)
+    random_user = factories.UserFactory()
+
+    assert handover.is_user_in_manager_team(staff_manager, random_user) is True
+    assert handover.is_user_in_manager_team(superuser_manager, random_user) is True
+
+    # 2. None / Self-check
+    assert handover.is_user_in_manager_team(None, random_user) is True
+    assert handover.is_user_in_manager_team(random_user, None) is True
+    assert handover.is_user_in_manager_team(random_user, random_user) is True
+
+    # 3. Test override attribute
+    regular_manager = factories.UserFactory(is_staff=False, is_superuser=False)
+    authorized_sub = factories.UserFactory()
+    authorized_sub.is_in_manager_team = True
+    unauthorized_sub = factories.UserFactory()
+    unauthorized_sub.is_in_manager_team = False
+
+    assert handover.is_user_in_manager_team(regular_manager, authorized_sub) is True
+    assert handover.is_user_in_manager_team(regular_manager, unauthorized_sub) is False
+
+    # 4. Demo environment check
+    demo_manager = factories.UserFactory(
+        email="manager@example.com", is_staff=False, is_superuser=False
+    )
+    demo_member = factories.UserFactory(email="subordinate@example.com")
+    outsider = factories.UserFactory(email="outsider@example.com")
+
+    assert handover.is_user_in_manager_team(demo_manager, demo_member) is True
+    assert handover.is_user_in_manager_team(demo_manager, outsider) is False
+
+
+def test_api_users_handover_transfer_unauthorized_recipient_rejected():
+    """Transfer API rejects recipients who are not in the manager's team."""
+    demo_manager = factories.UserFactory(
+        email="manager@example.com", is_staff=False, is_superuser=False
+    )
+    subordinate = factories.UserFactory(email="subordinate@example.com")
+    outsider_recipient = factories.UserFactory(email="outsider@example.com")
+
+    item = factories.ItemFactory(
+        creator=subordinate,
+        size=1024,
+        users=[(subordinate, models.RoleChoices.OWNER)],
+    )
+
+    client = APIClient()
+    client.force_login(demo_manager)
+
+    response = client.post(
+        f"/api/v1.0/users/{subordinate.id}/handover/transfer/",
+        data={
+            "recipient_id": str(outsider_recipient.id),
+            "item_ids": [str(item.id)],
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    res_data = response.json()
+    assert "recipient_id" in res_data["errors"][0]["attr"]
+    assert "not a member of the manager's team" in res_data["errors"][0]["detail"]
+    assert outsider_recipient.email in res_data["errors"][0]["detail"]
+
 

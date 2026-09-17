@@ -7,6 +7,7 @@ from lasuite.drf.models.choices import PRIVILEGED_ROLES
 from rest_framework import permissions
 
 from core.models import RoleChoices, get_trashbin_cutoff
+from core.services.handover import is_user_in_manager_team
 
 ACTION_FOR_METHOD_TO_PERMISSION = {
     "versions_detail": {"DELETE": "versions_destroy", "GET": "versions_retrieve"},
@@ -166,11 +167,14 @@ class IsManagerOf(IsAuthenticated):
             return False
 
         # -------------------------------------------------------------
-        # [SECURITY TODO - STEP-UP AUTHENTICATION]
-        # In production, check recent MFA / WebAuthn authentication:
+        # [SECURITY TODO - STEP-UP MFA & RECENT AUTH_TIME VERIFICATION]
+        # To limit the impact of session/cookie theft (infostealers), sensitive
+        # handover actions require fresh authentication / MFA with a strict TTL:
         # auth_time = request.auth.get("auth_time") if request.auth else None
-        # if not auth_time or (timezone.now().timestamp() - auth_time) > 900:
-        #     raise exceptions.AuthenticationFailed("MFA re-authentication required.")
+        # if not auth_time or (timezone.now().timestamp() - auth_time) > 300:  # 5 min TTL
+        #     raise exceptions.AuthenticationFailed(
+        #         "Recent MFA step-up re-authentication required."
+        #     )
         # -------------------------------------------------------------
         return True
 
@@ -191,12 +195,10 @@ class IsManagerOf(IsAuthenticated):
             return True
 
         # -------------------------------------------------------------
-        # [SECURITY TODO - MULTI-TENANT SIRET ISOLATION]
-        # Ensure the manager and subordinate belong to the exact same organization:
-        # manager_siret = manager.claims.get("siret")
-        # subordinae_siret = subordinate.claims.get("siret")
-        # if not manager_siret or manager_siret != subordinate_siret:
-        #     return False
+        # [SECURITY NOTE - MULTI-TENANT SIRET VS TEAM HIERARCHY]
+        # An OIDC `siret` claim covers an entire ministry or establishment,
+        # which is not granular enough to verify team reporting hierarchy.
+        # Team/managerial authority must be verified via directory services (Accounts/People).
         # -------------------------------------------------------------
 
         # Rule 3: Manager relationship verification (Mocked for now)
@@ -204,23 +206,28 @@ class IsManagerOf(IsAuthenticated):
 
     def _check_is_manager_of(self, manager, subordinate):
         """
-        Verify that `manager` has authority over `subordinate`.
-        Mocked for local development without external 'People' dependencies.
+        Verify that `manager` has managerial authority over `subordinate`.
+        Mocked for local development without external 'accounts' dependencies.
         """
         # -------------------------------------------------------------
-        # [INTEGRATION TODO - PEOPLE / LA RÉGIE API / ACCOUNTS ]
-        # In production:
-        # 1. Obtain an inter-service JWT token.
-        # 2. Call People/ACCOUNTS API: GET /api/v1.0/teams/?manager={manager.id}&member={subordinate.id}
-        # 3. Cache the relationship in Redis (e.g. 5 min TTL).
+        # [INTEGRATION TODO - ACCOUNTS (suitenumerique/accounts) AUTHORITY]
+        # Managerial validation will be handled exclusively by the `accounts` repo.
+        #
+        # Planned features/requirements on `accounts`:
+        # 1. Member Discovery: A manager session can query the list of subordinates
+        #    belonging to their organizational perimeter (GET /api/v1.0/organization/members/).
+        # 2. Dual Authority Check: `accounts` must verify that the requesting manager:
+        #    a) is the authorized manager of the departing user (`subordinate`), AND
+        #    b) is also the authorized manager of the `recipient` (when transferring).
+        #    *NOTE*: This validation feature is NOT yet implemented in the accounts repo.
+        #
+        # Ideal Security Workflow (Scoped Tokens with Short TTL):
+        # - The Handover App requests a scoped token from `accounts` (e.g. scope="handover:audit"
+        #   or "handover:transfer") with a short TTL (5-10 minutes) after confirming recent MFA.
+        # - The backend (Drive) verifies the scoped token cryptographically via JWKS or through
+        #   the accounts introspection endpoint (POST /api/v1.0/o/introspect/), guaranteeing
+        #   that the transaction is fully authorized without Drive needing internal org trees.
         # -------------------------------------------------------------
 
-        # MOCK IMPLEMENTATION FOR DEVELOPMENT:
-        # Option A: Simple allow-all for authenticated users in dev:
-        # return True
+        return is_user_in_manager_team(manager, subordinate)
 
-        # Option B: Mock via team match or simple email convention:
-        # e.g., allow if manager shares any team with subordinate:
-        # return bool(set(manager.teams) & set(subordinate.teams))
-
-        return True

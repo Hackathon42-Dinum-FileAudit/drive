@@ -427,6 +427,15 @@ class UserViewSet(
                 {"recipient_id": f"Recipient '{recipient_id}' not found."}
             )
 
+        if not handover.is_user_in_manager_team(request.user, recipient):
+            raise drf.exceptions.ValidationError(
+                {
+                    "recipient_id": (
+                        f"Recipient '{recipient.email}' is not a member of the manager's team."
+                    )
+                }
+            )
+
         item_ids = request.data.get("item_ids")
         if not item_ids or not isinstance(item_ids, list):
             raise drf.exceptions.ValidationError(

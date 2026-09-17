@@ -72,6 +72,13 @@ HANDOVER_USERS = {
         "short_name": "Charlie",
         "is_staff": False,
     },
+    "outsider": {  # External user not belonging to manager's team
+        "id": "2d915b4b-a763-4190-83a9-7380982d569e",
+        "email": "outsider@example.com",
+        "full_name": "Outsider User",
+        "short_name": "Outsider",
+        "is_staff": False,
+    },
 }
 
 DEMO_ITEM_PREFIX = "a0000000-0000-0000-0000-"
@@ -88,6 +95,8 @@ def _reset_or_create_user(user_data):
         user.is_superuser = False
         user.is_active = True
         user.password = make_password("drive")
+        if "id" in user_data:
+            user.sub = str(user_data["id"])
         user.save(
             update_fields=[
                 "is_staff",
@@ -96,6 +105,7 @@ def _reset_or_create_user(user_data):
                 "is_superuser",
                 "is_active",
                 "password",
+                "sub",
             ]
         )
         return user
@@ -103,7 +113,7 @@ def _reset_or_create_user(user_data):
     kwargs = {
         "admin_email": user_data["email"],
         "email": user_data["email"],
-        "sub": user_data["email"],
+        "sub": str(user_data["id"]) if "id" in user_data else user_data["email"],
         "full_name": user_data["full_name"],
         "short_name": user_data["short_name"],
         "password": make_password("drive"),
@@ -130,7 +140,7 @@ def _set_timestamps(item, created_at=None, updated_at=None):
     return item
 
 
-def _make_file(
+def _make_file(  # noqa: PLR0913
     title,
     filename,
     mimetype,
@@ -166,7 +176,7 @@ def _make_file(
     return file_item
 
 
-def create_handover_demo(stdout=None):
+def create_handover_demo(stdout=None):  # noqa: PLR0915
     """Seed handover demo data for frontend and API testing."""
     log = stdout.write if stdout else print
 
@@ -183,7 +193,6 @@ def create_handover_demo(stdout=None):
         users[key] = _reset_or_create_user(user_data)
         log(f"  [✓] {user_data['full_name']:<30} {user_data['email']:<30} (ID: {users[key].id})")
 
-    manager = users["manager"]
     subordinate = users["subordinate"]
     colleague = users["colleague"]
     recipient_2 = users["recipient_2"]
@@ -208,10 +217,28 @@ def create_handover_demo(stdout=None):
         (recipient_2, models.RoleChoices.READER),
         (recipient_3, models.RoleChoices.READER),
     ]
-    # Co-owned with colleague (subordinate is NOT sole owner)
+    # Co-owned with colleague Alice (subordinate is NOT sole owner)
     co_owned = [
         (subordinate, models.RoleChoices.OWNER),
         (colleague, models.RoleChoices.OWNER),
+    ]
+    # Co-owned with Recipient 2 Bob (subordinate is NOT sole owner)
+    co_owned_bob = [
+        (subordinate, models.RoleChoices.OWNER),
+        (recipient_2, models.RoleChoices.OWNER),
+    ]
+    # Co-owned with Alice and Bob (3 co-owners)
+    co_owned_trio = [
+        (subordinate, models.RoleChoices.OWNER),
+        (colleague, models.RoleChoices.OWNER),
+        (recipient_2, models.RoleChoices.OWNER),
+    ]
+    # Co-owned with all successors (4 co-owners)
+    co_owned_team = [
+        (subordinate, models.RoleChoices.OWNER),
+        (colleague, models.RoleChoices.OWNER),
+        (recipient_2, models.RoleChoices.OWNER),
+        (recipient_3, models.RoleChoices.OWNER),
     ]
     # Subordinate admin, colleague owner
     sub_admin = [
@@ -429,6 +456,55 @@ def create_handover_demo(stdout=None):
         created_at=now - timedelta(days=7),
         updated_at=now - timedelta(hours=6),
     )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000043",
+        title="inter_ministerial_roadmap_2026.pptx",
+        filename="inter_ministerial_roadmap_2026.pptx",
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        size=3400000,
+        parent=folder_4,
+        creator=subordinate,
+        users=co_owned_bob,
+        created_at=now - timedelta(days=14),
+        updated_at=now - timedelta(days=2),
+    )
+    subfolder_4a = factories.ItemFactory(
+        id=f"{DEMO_ITEM_PREFIX}000000000044",
+        title="Shared_Deliverables",
+        parent=folder_4,
+        type=models.ItemTypeChoices.FOLDER,
+        creator=subordinate,
+        users=co_owned_trio,
+    )
+    _set_timestamps(
+        subfolder_4a,
+        created_at=now - timedelta(days=18),
+        updated_at=now - timedelta(days=3),
+    )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000045",
+        title="sprint_deliverables_signoff.pdf",
+        filename="sprint_deliverables_signoff.pdf",
+        mimetype="application/pdf",
+        size=1200000,
+        parent=subfolder_4a,
+        creator=subordinate,
+        users=co_owned_trio,
+        created_at=now - timedelta(days=18),
+        updated_at=now - timedelta(days=3),
+    )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000046",
+        title="joint_procurement_contract.docx",
+        filename="joint_procurement_contract.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        size=2400000,
+        parent=subfolder_4a,
+        creator=subordinate,
+        users=co_owned_team,
+        created_at=now - timedelta(days=10),
+        updated_at=now - timedelta(days=1),
+    )
 
     # --- CASE 5: Subordinate is Admin (Colleague Owner) ---
     folder_5 = factories.ItemFactory(
@@ -509,6 +585,56 @@ def create_handover_demo(stdout=None):
         deleted_at=deleted_date,
         created_at=now - timedelta(days=730),
         updated_at=deleted_date,
+    )
+
+    # --- CASE 8: Multi-Owner Department Workspace (4 co-owners + diverse subfiles) ---
+    folder_8 = factories.ItemFactory(
+        id=f"{DEMO_ITEM_PREFIX}000000000080",
+        title="8_CoOwned_Department_Workspace",
+        type=models.ItemTypeChoices.FOLDER,
+        creator=subordinate,
+        users=co_owned_team,
+    )
+    _set_timestamps(
+        folder_8,
+        created_at=now - timedelta(days=60),
+        updated_at=now - timedelta(days=3),
+    )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000081",
+        title="department_annual_budget_2026.xlsx",
+        filename="department_annual_budget_2026.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        size=1850000,
+        parent=folder_8,
+        creator=subordinate,
+        users=co_owned,
+        created_at=now - timedelta(days=60),
+        updated_at=now - timedelta(days=5),
+    )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000082",
+        title="vendor_service_level_agreement_sla.pdf",
+        filename="vendor_service_level_agreement_sla.pdf",
+        mimetype="application/pdf",
+        size=3200000,
+        parent=folder_8,
+        creator=subordinate,
+        users=co_owned_bob,
+        created_at=now - timedelta(days=45),
+        updated_at=now - timedelta(days=12),
+    )
+    _make_file(
+        item_id=f"{DEMO_ITEM_PREFIX}000000000083",
+        title="cross_team_strategic_initiatives.pptx",
+        filename="cross_team_strategic_initiatives.pptx",
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        size=8900000,
+        parent=folder_8,
+        creator=subordinate,
+        users=co_owned_trio,
+        created_at=now - timedelta(days=30),
+        updated_at=now - timedelta(days=3),
     )
 
     log("  [✓] All folder structures and files generated successfully in English.")

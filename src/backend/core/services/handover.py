@@ -3,9 +3,10 @@ Service for auditing and transferring items during user offboarding/handover.
 Ensures continuity of public records when an agent leaves an administration.
 """
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, OuterRef, Q, Subquery, Sum, Value
+from django.db.models import Count, Exists, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 
 from lasuite.drf.models.choices import PRIVILEGED_ROLES, RoleChoices
@@ -15,6 +16,59 @@ from core.entitlements import get_entitlements_backend
 from core.services.accesses import synchronize_descendants_accesses
 from core.storage import get_storage_compute_backend
 from core.storage.cache import invalidate_storage_used_cache
+
+DEMO_TEAM_EMAILS = {
+    "subordinate@example.com",
+    "drive@drive.world",
+    "bob.colleague@example.com",
+    "charlie.colleague@example.com",
+}
+
+
+def is_user_in_manager_team(manager, user):
+    """
+    Verify whether `user` belongs to `manager`'s team.
+
+    Designed for upcoming accounts/teams API integration:
+    - Queries the accounts/teams service to verify that `manager` holds a managerial
+      role on a team where `user` is an active member.
+    - Caches authorization results in Redis with a short TTL.
+
+    Rules:
+    1. If `manager` or `user` is None -> returns True.
+    2. Staff / Superuser: Always allowed (bypasses hierarchy for platform administrators).
+    3. Self-check: manager.id == user.id -> returns True.
+    4. Test override: if hasattr(user, "is_in_manager_team") ->
+       returns bool(user.is_in_manager_team).
+    5. Demo environment:
+       - If manager.email == "manager@example.com":
+         Only members of the demo team (DEMO_TEAM_EMAILS) are authorized.
+         Any other user is rejected.
+    6. Accounts / Teams integration hook:
+       - If settings.HANDOVER_ACCOUNTS_BACKEND is configured, delegates to the backend.
+    7. Default fallback for development: returns True.
+    """
+    if manager is None or user is None or manager.id == user.id:
+        return True
+
+    if hasattr(user, "is_in_manager_team"):
+        return bool(user.is_in_manager_team)
+
+    # Demo environment check (applies to demo manager even when flagged is_staff)
+    if getattr(manager, "email", None) == "manager@example.com":
+        return getattr(user, "email", None) in DEMO_TEAM_EMAILS
+
+    # Platform administrators bypass hierarchy for non-demo users
+    if getattr(manager, "is_staff", False) or getattr(manager, "is_superuser", False):
+        return True
+
+    # Accounts / Teams integration hook (when configured)
+    accounts_backend = getattr(settings, "HANDOVER_ACCOUNTS_BACKEND", None)
+    if accounts_backend and hasattr(accounts_backend, "is_member_of_manager_team"):
+        return accounts_backend.is_member_of_manager_team(manager, user)
+
+    return True
+
 
 # TODO: DRF and Throttling
 """
@@ -46,7 +100,7 @@ Create a throttle class inheriting from rest_framework.throttling.UserRateThrott
 
 
 def _get_accesses_count_subqueries(departing_user):
-    """Return subqueries for computing other_members_count and total_owners_count."""
+    """Return subqueries for computing other_members, total_owners, and other_owners."""
     other_members_subquery = Coalesce(
         Subquery(
             models.ItemAccess.objects.filter(item=OuterRef("pk"))
@@ -66,7 +120,29 @@ def _get_accesses_count_subqueries(departing_user):
         ),
         Value(0),
     )
-    return other_members_subquery, total_owners_subquery
+    other_owners_subquery = Coalesce(
+        Subquery(
+            models.ItemAccess.objects.filter(item=OuterRef("pk"), role=RoleChoices.OWNER)
+            .exclude(user=departing_user)
+            .values("item")
+            .annotate(cnt=Count("id"))
+            .values("cnt")[:1]
+        ),
+        Value(0),
+    )
+    user_is_owner_subquery = Exists(
+        models.ItemAccess.objects.filter(
+            item=OuterRef("pk"),
+            user=departing_user,
+            role=RoleChoices.OWNER,
+        )
+    )
+    return (
+        other_members_subquery,
+        total_owners_subquery,
+        other_owners_subquery,
+        user_is_owner_subquery,
+    )
 
 
 def get_departing_user_administered_items(departing_user):
@@ -77,7 +153,12 @@ def get_departing_user_administered_items(departing_user):
     excluded for now;
     TODO: decide later whether they should be deleted or archived or handled differently.
     """
-    other_members_subquery, total_owners_subquery = _get_accesses_count_subqueries(departing_user)
+    (
+        other_members_subquery,
+        total_owners_subquery,
+        other_owners_subquery,
+        user_is_owner_subquery,
+    ) = _get_accesses_count_subqueries(departing_user)
 
     return (
         models.Item.objects.filter(
@@ -93,6 +174,10 @@ def get_departing_user_administered_items(departing_user):
         .annotate(
             # Count total owners on the item
             total_owners_count=total_owners_subquery,
+            # Count other owners on the item (excluding departing user)
+            other_owners_count=other_owners_subquery,
+            # Check if departing user holds explicit owner access
+            user_is_owner=user_is_owner_subquery,
             # Count other colleagues or teams with any access
             other_accesses_count=other_members_subquery,
         )
@@ -135,7 +220,7 @@ def build_user_handover_audit(departing_user):
         or 0
     )
 
-    other_members_subquery, _ = _get_accesses_count_subqueries(departing_user)
+    other_members_subquery, *_ = _get_accesses_count_subqueries(departing_user)
 
     # 4. Count skipped unshared items (administered by user with zero collaborators)
     unshared_qs = (
@@ -181,8 +266,11 @@ def build_user_handover_audit(departing_user):
     shared_count = 0
 
     for item in items:
-        # Sole owner: departing agent is an owner and total owner count is <= 1
-        is_sole_owner = item.total_owners_count <= 1
+        # Sole owner: departing agent is an owner and no other owners exist on the item
+        is_departing_user_owner = (
+            item.user_is_owner or (item.creator_id == departing_user.id)
+        )
+        is_sole_owner = is_departing_user_owner and item.other_owners_count == 0
         if is_sole_owner:
             sole_owner_count += 1
 
