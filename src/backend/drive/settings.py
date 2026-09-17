@@ -1678,6 +1678,7 @@ class Development(Base):
         "http://localhost:8072",
         "http://localhost:3000",
         *values.ListValue([], environ_name="CSRF_TRUSTED_ORIGINS"),
+        'http://localhost:3001',
     ]
     DEBUG = True
     LOAD_E2E_URLS = True
