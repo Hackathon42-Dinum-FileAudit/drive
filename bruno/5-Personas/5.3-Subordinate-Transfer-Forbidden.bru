@@ -1,7 +1,7 @@
 meta {
-  name: 5.2 Anti-Self Transfer Dry-Run [200 OK - Blocked]
+  name: 5.3 Subordinate Transfer Attempt [403 Forbidden]
   type: http
-  seq: 2
+  seq: 3
 }
 
 post {
@@ -19,17 +19,11 @@ headers {
 
 body:json {
   {
-    "recipient_id": "{{subordinate_id}}",
-    "item_ids": [
-      "a0000000-0000-0000-0000-000000000001"
-    ],
+    "recipient_id": "{{colleague_id}}",
     "dry_run": true
   }
 }
 
 assert {
-  res.status: eq 200
-  res.body.dry_run: eq true
-  res.body.can_execute: eq false
-  res.body.errors[0].code: eq invalid_recipient
+  res.status: eq 403
 }

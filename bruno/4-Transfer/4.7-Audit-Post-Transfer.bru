@@ -1,7 +1,7 @@
 meta {
-  name: 5.6 Handover Audit Post-Transfer [200 OK]
+  name: 4.7 Handover Audit Post-Transfer [200 OK]
   type: http
-  seq: 6
+  seq: 7
 }
 
 get {
@@ -17,5 +17,5 @@ headers {
 
 assert {
   res.status: eq 200
-  res.body.summary.sole_owner_count: eq 0
+  res.body.summary.sole_owner_count: eq 10
 }

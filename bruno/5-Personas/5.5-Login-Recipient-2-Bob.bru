@@ -1,7 +1,7 @@
 meta {
-  name: 1.1 Login as Manager
+  name: 5.5 Login as Recipient 2 (Bob)
   type: http
-  seq: 1
+  seq: 5
 }
 
 post {
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "email": "manager@example.com"
+    "email": "bob.colleague@example.com"
   }
 }
 
@@ -44,11 +44,10 @@ script:post-response {
     }
     if (sid && csrf) {
       const fullCookie = `${sid}; csrftoken=${csrf}`;
-      bru.setVar('cookie_header', fullCookie);
-      bru.setVar('manager_cookie_header', fullCookie);
-      try { bru.setEnvVar('cookie_header', fullCookie); } catch (e) {}
-      try { bru.setEnvVar('manager_cookie_header', fullCookie); } catch (e) {}
+      bru.setVar('recipient_2_cookie_header', fullCookie);
+      bru.setVar('recipient_2_csrf_token', csrf);
+      try { bru.setEnvVar('recipient_2_cookie_header', fullCookie); } catch (e) {}
+      try { bru.setEnvVar('recipient_2_csrf_token', csrf); } catch (e) {}
     }
   }
 }
-

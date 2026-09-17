@@ -1,7 +1,7 @@
 meta {
-  name: 5.4 Missing Recipient Attempt [400 Bad Request]
+  name: 4.3 Anti-Self Transfer Execution [400 Bad Request]
   type: http
-  seq: 4
+  seq: 3
 }
 
 post {
@@ -19,12 +19,16 @@ headers {
 
 body:json {
   {
-    "dry_run": true
+    "recipient_id": "{{subordinate_id}}",
+    "item_ids": [
+      "a0000000-0000-0000-0000-000000000001"
+    ],
+    "dry_run": false
   }
 }
 
 assert {
   res.status: eq 400
   res.body.type: eq validation_error
-  res.body.errors[0].attr: eq recipient_id
+  res.body.errors[0].attr: eq detail
 }

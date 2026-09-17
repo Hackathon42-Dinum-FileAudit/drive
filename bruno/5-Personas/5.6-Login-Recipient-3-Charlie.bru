@@ -1,7 +1,7 @@
 meta {
-  name: 1.3 Login as Colleague
+  name: 5.6 Login as Recipient 3 (Charlie)
   type: http
-  seq: 3
+  seq: 6
 }
 
 post {
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "email": "drive@drive.world"
+    "email": "charlie.colleague@example.com"
   }
 }
 
@@ -44,9 +44,10 @@ script:post-response {
     }
     if (sid && csrf) {
       const fullCookie = `${sid}; csrftoken=${csrf}`;
-      bru.setVar('cookie_header', fullCookie);
-      try { bru.setEnvVar('cookie_header', fullCookie); } catch (e) {}
+      bru.setVar('recipient_3_cookie_header', fullCookie);
+      bru.setVar('recipient_3_csrf_token', csrf);
+      try { bru.setEnvVar('recipient_3_cookie_header', fullCookie); } catch (e) {}
+      try { bru.setEnvVar('recipient_3_csrf_token', csrf); } catch (e) {}
     }
   }
 }
-

@@ -1,5 +1,5 @@
 meta {
-  name: 1.1 Login as Manager
+  name: 5.1 Login as Subordinate
   type: http
   seq: 1
 }
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "email": "manager@example.com"
+    "email": "subordinate@example.com"
   }
 }
 
@@ -45,9 +45,11 @@ script:post-response {
     if (sid && csrf) {
       const fullCookie = `${sid}; csrftoken=${csrf}`;
       bru.setVar('cookie_header', fullCookie);
-      bru.setVar('manager_cookie_header', fullCookie);
+      bru.setVar('subordinate_cookie_header', fullCookie);
+      bru.setVar('subordinate_csrf_token', csrf);
       try { bru.setEnvVar('cookie_header', fullCookie); } catch (e) {}
-      try { bru.setEnvVar('manager_cookie_header', fullCookie); } catch (e) {}
+      try { bru.setEnvVar('subordinate_cookie_header', fullCookie); } catch (e) {}
+      try { bru.setEnvVar('subordinate_csrf_token', csrf); } catch (e) {}
     }
   }
 }

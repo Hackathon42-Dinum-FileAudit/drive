@@ -81,8 +81,10 @@ def test_commands_create_handover_demo():
     call_command("create_handover_demo")
 
     assert models.User.objects.filter(email="manager@example.com", is_staff=True).exists()
-    assert models.User.objects.filter(email="subordinate@example.com").exists()
-    assert models.User.objects.filter(email="drive@drive.world").exists()
+    assert models.User.objects.filter(email="subordinate@example.com", is_staff=False).exists()
+    assert models.User.objects.filter(email="drive@drive.world", is_staff=False).exists()
+    assert models.User.objects.filter(email="bob.colleague@example.com", is_staff=False).exists()
+    assert models.User.objects.filter(email="charlie.colleague@example.com", is_staff=False).exists()
 
     # Check key handover items matching DEMO_ITEM_PREFIX
     prefix = "a0000000-0000-0000-0000-"
@@ -93,6 +95,12 @@ def test_commands_create_handover_demo():
     assert models.Item.objects.filter(
         id=f"{prefix}000000000070", deleted_at__isnull=False
     ).exists()
+
+    # Check staggered timestamps for realistic UI testing
+    root_file = models.Item.objects.get(id=f"{prefix}000000000001")
+    old_folder = models.Item.objects.get(id=f"{prefix}000000000030")
+    assert old_folder.created_at < root_file.created_at
+    assert root_file.updated_at > root_file.created_at
 
 
 @override_settings(DEBUG=True)

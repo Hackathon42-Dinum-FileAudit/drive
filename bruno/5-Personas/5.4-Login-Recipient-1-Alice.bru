@@ -1,7 +1,7 @@
 meta {
-  name: 1.2 Login as Subordinate
+  name: 5.4 Login as Recipient 1 (Alice)
   type: http
-  seq: 2
+  seq: 4
 }
 
 post {
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "email": "subordinate@example.com"
+    "email": "drive@drive.world"
   }
 }
 
@@ -44,8 +44,10 @@ script:post-response {
     }
     if (sid && csrf) {
       const fullCookie = `${sid}; csrftoken=${csrf}`;
-      bru.setVar('cookie_header', fullCookie);
-      try { bru.setEnvVar('cookie_header', fullCookie); } catch (e) {}
+      bru.setVar('colleague_cookie_header', fullCookie);
+      bru.setVar('colleague_csrf_token', csrf);
+      try { bru.setEnvVar('colleague_cookie_header', fullCookie); } catch (e) {}
+      try { bru.setEnvVar('colleague_csrf_token', csrf); } catch (e) {}
     }
   }
 }

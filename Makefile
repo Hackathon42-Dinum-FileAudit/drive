@@ -149,6 +149,15 @@ down: ## stop and remove containers, networks, images, and volumes
 	rm -rf data/postgresql.*
 .PHONY: down
 
+keycloak-reset: ## reset keycloak db and re-import realm.json with updated users
+	@echo "$(BOLD)Resetting Keycloak database and re-importing realm.json...$(RESET)"
+	@$(COMPOSE) down -v keycloak kc_postgresql
+	@$(COMPOSE) up -d kc_postgresql keycloak
+.PHONY: keycloak-reset
+
+reset-keycloak: keycloak-reset ## alias for keycloak-reset
+.PHONY: reset-keycloak
+
 logs: ## display app-dev logs (follow mode)
 	@$(COMPOSE) logs -f app-dev
 .PHONY: logs

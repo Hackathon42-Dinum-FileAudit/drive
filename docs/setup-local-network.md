@@ -35,8 +35,10 @@ In `docker/auth/realm.json`, find the `drive` client's `redirectUris` and `webOr
 **Important**: Keycloak imports `realm.json` only on first startup. If the database already exists, you must either:
 - Delete the Keycloak database and recreate both services:
   ```bash
-  docker compose down -v kc_postgresql keycloak
-  docker compose up -d kc_postgresql keycloak
+  make keycloak-reset
+  # or directly:
+  # docker compose down -v keycloak kc_postgresql
+  # docker compose up -d kc_postgresql keycloak
   ```
 - Or add the URIs manually via the Keycloak admin console at `http://<YOUR_IP>:8083/admin/` (admin / admin) → **Clients → drive → Valid redirect URIs**
 

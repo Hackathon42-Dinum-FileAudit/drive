@@ -161,6 +161,62 @@
           }
         ],
         "realmRoles": ["user"]
+      },
+      {
+        "username": "manager",
+        "email": "manager@example.com",
+        "firstName": "Line",
+        "lastName": "Manager",
+        "enabled": true,
+        "credentials": [
+          {
+            "type": "password",
+            "value": "drive"
+          }
+        ],
+        "realmRoles": ["user"]
+      },
+      {
+        "username": "subordinate",
+        "email": "subordinate@example.com",
+        "firstName": "John",
+        "lastName": "Doe",
+        "enabled": true,
+        "credentials": [
+          {
+            "type": "password",
+            "value": "drive"
+          }
+        ],
+        "realmRoles": ["user"]
+      },
+      {
+        "username": "bob",
+        "email": "bob.colleague@example.com",
+        "firstName": "Bob",
+        "lastName": "Dupont",
+        "enabled": true,
+        "credentials": [
+          {
+            "type": "password",
+            "value": "drive"
+          }
+        ],
+        "realmRoles": ["user"]
+      },
+      {
+        "username": "charlie",
+        "email": "charlie.colleague@example.com",
+        "firstName": "Charlie",
+        "lastName": "Leroy",
+        "enabled": true,
+        "credentials": [
+          {
+            "type": "password",
+            "value": "drive"
+          }
+        ],
+        "realmRoles": ["user"]
       }
     ],
     "roles": {

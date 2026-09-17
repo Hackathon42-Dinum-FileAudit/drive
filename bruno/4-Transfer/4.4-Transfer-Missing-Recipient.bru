@@ -1,7 +1,7 @@
 meta {
-  name: 5.4b Missing Item IDs Attempt [400 Bad Request]
+  name: 4.4 Missing Recipient Attempt [400 Bad Request]
   type: http
-  seq: 5
+  seq: 4
 }
 
 post {
@@ -19,7 +19,6 @@ headers {
 
 body:json {
   {
-    "recipient_id": "{{colleague_id}}",
     "dry_run": true
   }
 }
@@ -27,5 +26,5 @@ body:json {
 assert {
   res.status: eq 400
   res.body.type: eq validation_error
-  res.body.errors[0].attr: eq item_ids
+  res.body.errors[0].attr: eq recipient_id
 }

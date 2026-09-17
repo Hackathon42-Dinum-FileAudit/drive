@@ -1,7 +1,7 @@
 meta {
-  name: 5.3 Anti-Self Transfer Execution [400 Bad Request]
+  name: 4.2 Anti-Self Transfer Dry-Run [200 OK - Blocked]
   type: http
-  seq: 3
+  seq: 2
 }
 
 post {
@@ -23,12 +23,13 @@ body:json {
     "item_ids": [
       "a0000000-0000-0000-0000-000000000001"
     ],
-    "dry_run": false
+    "dry_run": true
   }
 }
 
 assert {
-  res.status: eq 400
-  res.body.type: eq validation_error
-  res.body.errors[0].attr: eq detail
+  res.status: eq 200
+  res.body.dry_run: eq true
+  res.body.can_execute: eq false
+  res.body.errors[0].code: eq invalid_recipient
 }

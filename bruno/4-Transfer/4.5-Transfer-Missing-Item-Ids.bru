@@ -1,7 +1,7 @@
 meta {
-  name: 5.7 Subordinate Transfer Attempt [403 Forbidden]
+  name: 4.5 Missing Item IDs Attempt [400 Bad Request]
   type: http
-  seq: 7
+  seq: 5
 }
 
 post {
@@ -25,5 +25,7 @@ body:json {
 }
 
 assert {
-  res.status: eq 403
+  res.status: eq 400
+  res.body.type: eq validation_error
+  res.body.errors[0].attr: eq item_ids
 }
