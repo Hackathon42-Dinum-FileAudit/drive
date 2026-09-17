@@ -376,6 +376,82 @@ class UserViewSet(
             },
             status=status.HTTP_200_OK,
         )
+    
+    @drf.decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="handover/transfer",
+        permission_classes=[permissions.IsManagerOf],
+    )
+    def handover_transfer(self, request, pk=None):
+        """
+        Transfer ownership of items administered by a departing user to a recipient.
+
+        Supports a dry-run simulation mode (dry_run=true) that returns validation,
+        quota projections, and warnings without modifying the database.
+        """
+        departing_user = self.get_object()
+
+        recipient_id = request.data.get("recipient_id") or request.data.get("target_user_id")
+        if not recipient_id:
+            raise drf.exceptions.ValidationError(
+                {"recipient_id": "This field is required (use 'recipient_id' or 'target_user_id')."}
+            )
+
+        try:
+            recipient = models.User.objects.get(id=recipient_id)
+        except (models.User.DoesNotExist, ValueError):
+            recipient = models.User.objects.filter(email=recipient_id).first()
+
+        if not recipient:
+            raise drf.exceptions.ValidationError(
+                {"recipient_id": f"Recipient '{recipient_id}' not found."}
+            )
+
+        item_ids = request.data.get("item_ids")
+        if not item_ids or not isinstance(item_ids, list):
+            raise drf.exceptions.ValidationError(
+                {"item_ids": "This field is required and must be a non-empty list of item IDs."}
+            )
+
+        reallocate_storage_quota = request.data.get("reallocate_storage_quota", False)
+        if isinstance(reallocate_storage_quota, str):
+            reallocate_storage_quota = reallocate_storage_quota.lower() in ("true", "1")
+
+        departing_user_action = request.data.get("departing_user_action")
+        if not departing_user_action:
+            if request.data.get("keep_departing_access") or request.data.get("keep_access"):
+                departing_user_action = "keep_reader"
+            else:
+                departing_user_action = "revoke"
+
+        dry_run = request.data.get("dry_run", False)
+        if isinstance(dry_run, str):
+            dry_run = dry_run.lower() in ("true", "1")
+
+        if dry_run:
+            simulation = handover.simulate_handover_transfer(
+                departing_user=departing_user,
+                recipient=recipient,
+                item_ids=item_ids,
+                reallocate_storage_quota=reallocate_storage_quota,
+                departing_user_action=departing_user_action,
+            )
+            return drf.response.Response(simulation)
+
+        try:
+            result = handover.execute_handover_transfer(
+                departing_user=departing_user,
+                recipient=recipient,
+                item_ids=item_ids,
+                reallocate_storage_quota=reallocate_storage_quota,
+                departing_user_action=departing_user_action,
+            )
+        except ValidationError as err:
+            errors = err.message if hasattr(err, "message") else err
+            raise drf.exceptions.ValidationError({"detail": errors}) from err
+
+        return drf.response.Response(result)
 
 
 class ItemMetadata(drf.metadata.SimpleMetadata):

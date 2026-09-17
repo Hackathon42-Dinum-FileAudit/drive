@@ -1,0 +1,52 @@
+meta {
+  name: 1.1 Login as Manager
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/e2e/user-auth/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "manager@example.com"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  const setCookies = res.getHeader('set-cookie');
+  if (setCookies) {
+    const list = Array.isArray(setCookies) ? setCookies : [setCookies];
+    let sid = '';
+    let csrf = '';
+    for (let c of list) {
+      if (c.includes('drive_sessionid=')) {
+        sid = c.split(';')[0].trim();
+        bru.setVar('session_cookie', sid);
+        try { bru.setEnvVar('session_cookie', sid); } catch (e) {}
+      }
+      if (c.includes('csrftoken=')) {
+        csrf = c.split(';')[0].split('=')[1].trim();
+        bru.setVar('csrf_token', csrf);
+        try { bru.setEnvVar('csrf_token', csrf); } catch (e) {}
+      }
+    }
+    if (sid && csrf) {
+      const fullCookie = `${sid}; csrftoken=${csrf}`;
+      bru.setVar('cookie_header', fullCookie);
+      try { bru.setEnvVar('cookie_header', fullCookie); } catch (e) {}
+    }
+  }
+}
+

@@ -282,6 +282,12 @@ class Command(BaseCommand):
             default=False,
             help="Create items for several file types",
         )
+        parser.add_argument(
+            "--handover",
+            action="store_true",
+            default=False,
+            help="Create users and items for handover / offboarding demo scenario",
+        )
 
     def handle(self, *args, **options):
         """Handling of the management command."""
@@ -297,3 +303,8 @@ class Command(BaseCommand):
             self.stdout,
             file_types=options["file_types"],
         )
+
+        if options["handover"]:
+            from demo.management.commands.create_handover_demo import create_handover_demo
+
+            create_handover_demo(self.stdout)

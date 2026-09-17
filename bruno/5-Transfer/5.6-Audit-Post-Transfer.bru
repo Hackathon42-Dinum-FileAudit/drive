@@ -1,0 +1,21 @@
+meta {
+  name: 5.6 Handover Audit Post-Transfer [200 OK]
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/audit/
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: {{cookie_header}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.summary.sole_owner_count: eq 0
+}

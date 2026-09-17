@@ -1,0 +1,29 @@
+meta {
+  name: 5.7 Subordinate Transfer Attempt [403 Forbidden]
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/transfer/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "recipient_id": "{{colleague_id}}",
+    "dry_run": true
+  }
+}
+
+assert {
+  res.status: eq 403
+}

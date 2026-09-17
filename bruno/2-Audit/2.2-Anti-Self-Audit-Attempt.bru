@@ -1,0 +1,20 @@
+meta {
+  name: 2.2 Anti-Self Audit Attempt [403 Forbidden]
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1.0/users/{{manager_id}}/handover/audit/
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: {{cookie_header}}
+}
+
+assert {
+  res.status: eq 403
+}

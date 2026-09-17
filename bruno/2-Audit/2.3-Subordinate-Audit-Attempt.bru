@@ -1,0 +1,20 @@
+meta {
+  name: 2.3 Subordinate Audit Attempt [403 Forbidden]
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/audit/
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: {{cookie_header}}
+}
+
+assert {
+  res.status: eq 403
+}

@@ -1,0 +1,38 @@
+meta {
+  name: 5.5 Execute Transfer [200 OK]
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1.0/users/{{subordinate_id}}/handover/transfer/
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  X-CSRFToken: {{csrf_token}}
+  Cookie: {{cookie_header}}
+}
+
+body:json {
+  {
+    "recipient_id": "{{colleague_id}}",
+    "item_ids": [
+      "a0000000-0000-0000-0000-000000000001",
+      "a0000000-0000-0000-0000-000000000020"
+    ],
+    "dry_run": false,
+    "reallocate_storage_quota": true
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.dry_run: eq false
+  res.body.status: eq completed
+  res.body.summary.reallocate_storage_quota: eq true
+  res.body.summary.items_transferred: isDefined
+}
